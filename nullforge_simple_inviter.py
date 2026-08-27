@@ -240,6 +240,9 @@ class Api:
         if self.state["vrchat_log_folder"]:
             self._restart_watcher()
 
+        if self.state["group_id"] and not self.state["group_name"] and self.state["auth_cookie"]:
+            self._resolve_group_name()
+
     def _log(self, msg: str):
         ts = datetime.now().strftime("%H:%M:%S")
         self.activity.append(f"[{ts}] {msg}")
