@@ -58,11 +58,11 @@ LOCAL_KEY_FILE = os.path.join(APP_DIR, "local.key")
 DEFAULT_STATE = {
     "vrchat_log_folder": "",
     "group_id": "",
+    "group_name": "",
     "auth_cookie": "",
     "auth_display_name": "",
-    "auto_invite_on_join": False,
-    "verified_18plus_mode": False,
-    "verified_18plus_delay_seconds": 40,
+    "auto_invite_enabled": False,
+    "invite_delay_seconds": 40,
     "invited_user_ids": [],
     "daily_invite_count": 0,
     "daily_count_reset_at": None,
@@ -149,6 +149,16 @@ def vrchat_submit_2fa(partial_cookie: str, method: str, code: str) -> str:
 
 def vrchat_get_current_user(cookie: str) -> dict:
     resp = httpx.get(f"{VRCHAT_API_BASE}/auth/user", headers={"Cookie": f"auth={cookie}", "User-Agent": USER_AGENT}, follow_redirects=True)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def vrchat_get_group(cookie: str, group_id: str) -> dict:
+    resp = httpx.get(
+        f"{VRCHAT_API_BASE}/groups/{group_id}",
+        headers={"Cookie": f"auth={cookie}", "User-Agent": USER_AGENT},
+        follow_redirects=True,
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -240,11 +250,11 @@ class Api:
         return {
             "vrchat_log_folder": self.state["vrchat_log_folder"],
             "group_id": self.state["group_id"],
+            "group_name": self.state["group_name"],
             "auth_ok": bool(self.state["auth_cookie"]),
             "auth_display": self.state["auth_display_name"] or "Not logged in",
-            "auto_invite_on_join": self.state["auto_invite_on_join"],
-            "verified_18plus_mode": self.state["verified_18plus_mode"],
-            "verified_18plus_delay_seconds": self.state["verified_18plus_delay_seconds"],
+            "auto_invite_enabled": self.state["auto_invite_enabled"],
+            "invite_delay_seconds": self.state["invite_delay_seconds"],
             "watching_file": self.watching_file,
             "total_invited": len(self.state["invited_user_ids"]),
             "detected": self.detected[-500:],  # cap what's sent/rendered
@@ -265,8 +275,20 @@ class Api:
 
     def set_group(self, group_id: str):
         self.state["group_id"] = group_id.strip()
+        self.state["group_name"] = ""
         save_state(self.state)
         self._log(f"Group set to {self.state['group_id']}")
+        self._resolve_group_name()
+
+    def _resolve_group_name(self):
+        if not self.state["group_id"] or not self.state["auth_cookie"]:
+            return
+        try:
+            group = vrchat_get_group(self.state["auth_cookie"], self.state["group_id"])
+            self.state["group_name"] = group.get("name", "")
+            save_state(self.state)
+        except Exception as e:
+            self._log(f"Could not fetch group name: {e}")
 
     def login(self, username: str, password: str):
         try:
@@ -308,18 +330,15 @@ class Api:
         self.state["auth_display_name"] = user.get("displayName", "?")
         save_state(self.state)
         self._log(f"Logged in as {self.state['auth_display_name']}.")
+        self._resolve_group_name()
         return {"success": True}
 
     def toggle_auto_invite(self, value: bool):
-        self.state["auto_invite_on_join"] = bool(value)
-        save_state(self.state)
-
-    def toggle_verified_mode(self, value: bool):
-        self.state["verified_18plus_mode"] = bool(value)
+        self.state["auto_invite_enabled"] = bool(value)
         save_state(self.state)
 
     def set_delay(self, seconds: int):
-        self.state["verified_18plus_delay_seconds"] = max(0, int(seconds))
+        self.state["invite_delay_seconds"] = max(0, int(seconds))
         save_state(self.state)
 
     # ---------- detected list actions ----------
@@ -481,20 +500,16 @@ class Api:
 
             m = JOIN_PATTERN.search(line)
             if not m:
-                # Diagnostic: if VRChat's format has changed, this surfaces the
-                # actual line so the regex can be corrected against real data.
-                if "OnPlayerJoined" in line:
-                    self._log(f"[unmatched join line] {line.strip()[:200]}")
                 continue
             name, user_id = m.group("name").strip(), m.group("user_id")
             already_invited = user_id in self.state["invited_user_ids"]
             self.detected.append({"name": name, "user_id": user_id, "invited": already_invited})
             self._log(f"Detected join: {name}")
 
-            if not self.state["auto_invite_on_join"] or already_invited:
+            if not self.state["auto_invite_enabled"] or already_invited:
                 continue
 
-            delay = self.state["verified_18plus_delay_seconds"] if self.state["verified_18plus_mode"] else 0
+            delay = self.state["invite_delay_seconds"]
             if delay > 0:
                 threading.Timer(delay, lambda n=name, u=user_id: self._dispatch_invite(n, u)).start()
             else:

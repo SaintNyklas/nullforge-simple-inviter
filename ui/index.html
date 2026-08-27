@@ -139,7 +139,7 @@
         <span class="field-value" id="logFolderVal">(not set)</span>
       </div>
       <div class="field-row">
-        <span class="field-label">Group ID</span>
+        <span class="field-label">Group</span>
         <span class="field-value" id="groupVal">(not set)</span>
       </div>
       <div class="field-row">
@@ -154,19 +154,13 @@
     </div>
 
     <div class="col glass panel">
-      <h2>Invite Behavior</h2>
+      <h2>Auto Inviter</h2>
 
       <div class="toggle-row">
         <label class="switch"><input type="checkbox" id="autoInviteToggle" onchange="onToggleAuto()"><span class="slider"></span></label>
-        <span class="field-label">Auto-invite on join</span>
+        <span class="field-label">Enabled</span>
       </div>
-      <div class="desc">Invites the moment someone joins — no delay unless set below. Use for regular, ungated groups.</div>
-
-      <div class="toggle-row">
-        <label class="switch"><input type="checkbox" id="verifiedToggle" onchange="onToggleVerified()"><span class="slider"></span></label>
-        <span class="field-label">18+ verified worlds mode</span>
-      </div>
-      <div class="desc">Assumes VRChat's own age verification already gated entry to this instance. Adds a delay below as a buffer, not a substitute for verification.</div>
+      <div class="desc">Invites people automatically after they join, following the delay below. Set delay to 0 for an instant invite, or raise it if you want a buffer — e.g. for instances already gated by VRChat's own age verification.</div>
 
       <div class="field-row" style="margin-top:12px;">
         <span class="field-label">Delay before inviting (seconds)</span>
@@ -312,7 +306,6 @@ async function submit2fa() {
 
 async function pickLogFolder() { await api().pick_log_folder(); refresh(); }
 async function onToggleAuto() { await api().toggle_auto_invite(document.getElementById('autoInviteToggle').checked); }
-async function onToggleVerified() { await api().toggle_verified_mode(document.getElementById('verifiedToggle').checked); }
 async function onDelayChange() { await api().set_delay(parseInt(document.getElementById('delayInput').value) || 0); }
 
 function toggleSelect(userId, el) {
@@ -336,12 +329,13 @@ async function refresh() {
   const state = await api().get_state();
 
   document.getElementById('logFolderVal').textContent = state.vrchat_log_folder || '(not set)';
-  document.getElementById('groupVal').textContent = state.group_id || '(not set)';
+  document.getElementById('groupVal').textContent = state.group_id
+    ? (state.group_name ? `${state.group_name} (${state.group_id})` : state.group_id)
+    : '(not set)';
   document.getElementById('authVal').textContent = state.auth_display || 'Not logged in';
   document.getElementById('authDot').className = 'status-dot ' + (state.auth_ok ? 'ok' : 'bad');
-  document.getElementById('autoInviteToggle').checked = state.auto_invite_on_join;
-  document.getElementById('verifiedToggle').checked = state.verified_18plus_mode;
-  document.getElementById('delayInput').value = state.verified_18plus_delay_seconds;
+  document.getElementById('autoInviteToggle').checked = state.auto_invite_enabled;
+  document.getElementById('delayInput').value = state.invite_delay_seconds;
   document.getElementById('watchingStat').textContent = 'Watching: ' + (state.watching_file || '(not started)');
   document.getElementById('totalInvitedStat').textContent = 'Total invited: ' + state.total_invited;
 
