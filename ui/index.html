@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Nullforge Simple Inviter</title>
+<style>
+  @font-face { font-family: 'system'; src: local('Segoe UI'); }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #eae7f0;
+    overflow: hidden;
+  }
+  body {
+    background: url('nullforge_bg.png') center center / cover no-repeat fixed, #000;
+  }
+  .overlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 30%, rgba(10,8,16,0.35), rgba(5,3,8,0.75));
+    z-index: 0;
+  }
+  .app {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    height: 100vh; padding: 18px 24px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .brand img { width: 28px; height: 28px; filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); }
+  .brand h1 {
+    font-size: 15px; letter-spacing: 3px; font-weight: 600;
+    margin: 0; color: #f2f0f7; text-transform: uppercase;
+  }
+
+  .glass {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  }
+
+  .row { display: flex; gap: 16px; margin-bottom: 16px; }
+  .col { flex: 1; }
+
+  .panel { padding: 16px 18px; margin-bottom: 16px; }
+  .panel h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: #b7a8dd; margin: 0 0 12px 0; font-weight: 600;
+  }
+
+  .field-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+  .field-label { color: #cfc9dd; }
+  .field-value { color: #9d90b8; font-size: 12px; }
+
+  button {
+    background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+    border: none; color: white; padding: 7px 14px;
+    border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: transform 0.1s, box-shadow 0.15s;
+  }
+  button:hover { box-shadow: 0 0 14px rgba(139,92,246,0.6); transform: translateY(-1px); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+  button.ghost { background: rgba(255,255,255,0.08); }
+
+  input[type=text], input[type=password], input[type=number] {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: #f0edf7; padding: 8px 10px; border-radius: 8px;
+    font-size: 13px; width: 100%;
+  }
+
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .toggle-row .desc { font-size: 11px; color: #9d90b8; margin-left: 30px; margin-top: -4px; margin-bottom: 8px; }
+  .switch { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: rgba(255,255,255,0.15); border-radius: 20px; transition: 0.2s;
+  }
+  .slider:before {
+    content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px;
+    background: white; border-radius: 50%; transition: 0.2s;
+  }
+  input:checked + .slider { background: #8b5cf6; }
+  input:checked + .slider:before { transform: translateX(18px); }
+
+  .main-body { flex: 1; display: flex; gap: 16px; min-height: 0; }
+  .detected-panel { flex: 2; display: flex; flex-direction: column; min-height: 0; }
+  .activity-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    text-align: left; color: #b7a8dd; font-weight: 600;
+    padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.12);
+    position: sticky; top: 0; background: rgba(20,14,32,0.6); backdrop-filter: blur(8px);
+  }
+  tbody td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  tbody tr:hover { background: rgba(139,92,246,0.1); }
+  tbody tr.selected { background: rgba(139,92,246,0.25); }
+  .table-scroll { overflow-y: auto; flex: 1; }
+  .badge { padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+  .badge.yes { background: rgba(34,197,94,0.2); color: #4ade80; }
+  .badge.no { background: rgba(255,255,255,0.1); color: #9d90b8; }
+
+  .activity-log { flex: 1; overflow-y: auto; font-size: 11px; color: #b7a8dd; font-family: 'Consolas', monospace; }
+  .activity-log div { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .status-dot.ok { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-dot.bad { background: #f87171; }
+
+  .footer-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .stat { font-size: 11px; color: #9d90b8; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="overlay"></div>
+<div class="app">
+
+  <div class="brand">
+    <img src="nullforge_icon.png">
+    <h1>Nullforge Simple Inviter</h1>
+  </div>
+
+  <div class="row">
+    <div class="col glass panel">
+      <h2>Setup</h2>
+      <div class="field-row">
+        <span class="field-label">Log folder</span>
+        <span class="field-value" id="logFolderVal">(not set)</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Group ID</span>
+        <span class="field-value" id="groupVal">(not set)</span>
+      </div>
+      <div class="field-row">
+        <span class="field-label"><span class="status-dot bad" id="authDot"></span>Account</span>
+        <span class="field-value" id="authVal">Not logged in</span>
+      </div>
+      <div class="footer-actions">
+        <button onclick="pickLogFolder()">Log Folder…</button>
+        <button onclick="showGroupModal()">Set Group…</button>
+        <button onclick="showLoginModal()">Log In…</button>
+      </div>
+    </div>
+
+    <div class="col glass panel">
+      <h2>Invite Behavior</h2>
+
+      <div class="toggle-row">
+        <label class="switch"><input type="checkbox" id="autoInviteToggle" onchange="onToggleAuto()"><span class="slider"></span></label>
+        <span class="field-label">Auto-invite on join</span>
+      </div>
+      <div class="desc">Invites the moment someone joins — no delay unless set below. Use for regular, ungated groups.</div>
+
+      <div class="toggle-row">
+        <label class="switch"><input type="checkbox" id="verifiedToggle" onchange="onToggleVerified()"><span class="slider"></span></label>
+        <span class="field-label">18+ verified worlds mode</span>
+      </div>
+      <div class="desc">Assumes VRChat's own age verification already gated entry to this instance. Adds a delay below as a buffer, not a substitute for verification.</div>
+
+      <div class="field-row" style="margin-top:12px;">
+        <span class="field-label">Delay before inviting (seconds)</span>
+        <input type="number" id="delayInput" value="40" style="width:70px" onchange="onDelayChange()">
+      </div>
+    </div>
+  </div>
+
+  <div class="main-body">
+    <div class="detected-panel glass panel">
+      <h2>Detected</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th style="width:24px"></th><th>Name</th><th>UserID</th><th>Invited</th></tr></thead>
+          <tbody id="detectedBody"></tbody>
+        </table>
+      </div>
+      <div class="footer-actions">
+        <button onclick="inviteSelected()">Invite Selected</button>
+        <button class="ghost" onclick="markSelectedInvited()">Mark as Invited</button>
+        <button class="ghost" onclick="saveList()">Save List</button>
+        <button class="ghost" onclick="loadList()">Load List</button>
+        <button class="danger" onclick="clearList()">Clear List</button>
+        <span class="stat" style="margin-left:auto; align-self:center;" id="totalInvitedStat">Total invited: 0</span>
+      </div>
+    </div>
+
+    <div class="activity-panel glass panel">
+      <h2>Activity</h2>
+      <div class="activity-log" id="activityLog"></div>
+      <div class="stat" id="watchingStat" style="margin-top:8px;">Watching: (not started)</div>
+    </div>
+  </div>
+</div>
+
+<!-- Simple modal for group / login input, kept minimal -->
+<div id="modalRoot"></div>
+
+<script>
+let selectedIds = new Set();
+let api = () => window.pywebview.api;
+
+function renderModal(html) {
+  document.getElementById('modalRoot').innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10;display:flex;align-items:center;justify-content:center;">
+      <div class="glass" style="padding:22px;width:340px;">${html}</div>
+    </div>`;
+}
+function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+function showGroupModal() {
+  renderModal(`
+    <h2>Set Group</h2>
+    <input type="text" id="groupInput" placeholder="grp_...">
+    <div class="footer-actions" style="margin-top:12px;">
+      <button onclick="submitGroup()">Save</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+async function submitGroup() {
+  const val = document.getElementById('groupInput').value.trim();
+  if (val) await api().set_group(val);
+  closeModal();
+  refresh();
+}
+
+function showLoginModal() {
+  renderModal(`
+    <h2>VRChat Login</h2>
+    <div class="footer-actions" style="margin-bottom:14px;">
+      <button id="tabPassword" onclick="switchLoginTab('password')">Email + Password</button>
+      <button id="tabCookie" class="ghost" onclick="switchLoginTab('cookie')">Auth Cookie</button>
+    </div>
+
+    <div id="loginTabPassword">
+      <input type="text" id="userInput" placeholder="Username or email" style="margin-bottom:8px;">
+      <input type="password" id="passInput" placeholder="Password">
+      <div class="footer-actions" style="margin-top:12px;">
+        <button onclick="submitLogin()">Log In</button>
+        <button class="ghost" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="loginTabCookie" style="display:none;">
+      <div style="font-size:11px;color:#9d90b8;margin-bottom:8px;">
+        Paste an existing VRChat auth cookie if you already have one
+        (e.g. exported from a browser session) — skips login/2FA entirely.
+      </div>
+      <input type="text" id="cookieInput" placeholder="auth cookie value">
+      <div class="footer-actions" style="margin-top:12px;">
+        <button onclick="submitCookieLogin()">Log In</button>
+        <button class="ghost" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>
+  `);
+}
+
+function switchLoginTab(tab) {
+  document.getElementById('loginTabPassword').style.display = tab === 'password' ? 'block' : 'none';
+  document.getElementById('loginTabCookie').style.display = tab === 'cookie' ? 'block' : 'none';
+  document.getElementById('tabPassword').className = tab === 'password' ? '' : 'ghost';
+  document.getElementById('tabCookie').className = tab === 'cookie' ? '' : 'ghost';
+}
+
+async function submitCookieLogin() {
+  const cookie = document.getElementById('cookieInput').value;
+  const result = await api().login_with_cookie(cookie);
+  if (result.error) { alert(result.error); return; }
+  closeModal();
+  refresh();
+}
+
+async function submitLogin() {
+  const username = document.getElementById('userInput').value;
+  const password = document.getElementById('passInput').value;
+  const result = await api().login(username, password);
+  if (result.needs_2fa) {
+    const methodLabel = result.method === 'totp'
+      ? 'Enter the code from your authenticator app'
+      : 'Enter the code sent to your email';
+    renderModal(`
+      <h2>2FA Required</h2>
+      <div style="font-size:12px;color:#cfc9dd;margin-bottom:8px;">${methodLabel}</div>
+      <input type="text" id="codeInput" placeholder="Code">
+      <div class="footer-actions" style="margin-top:12px;">
+        <button onclick="submit2fa()">Verify</button>
+        <button class="ghost" onclick="closeModal()">Cancel</button>
+      </div>`);
+  } else if (result.error) {
+    alert(result.error);
+  } else {
+    closeModal();
+  }
+  refresh();
+}
+async function submit2fa() {
+  const code = document.getElementById('codeInput').value;
+  const result = await api().submit_2fa(code);
+  if (result.error) alert(result.error);
+  closeModal();
+  refresh();
+}
+
+async function pickLogFolder() { await api().pick_log_folder(); refresh(); }
+async function onToggleAuto() { await api().toggle_auto_invite(document.getElementById('autoInviteToggle').checked); }
+async function onToggleVerified() { await api().toggle_verified_mode(document.getElementById('verifiedToggle').checked); }
+async function onDelayChange() { await api().set_delay(parseInt(document.getElementById('delayInput').value) || 0); }
+
+function toggleSelect(userId, el) {
+  if (selectedIds.has(userId)) { selectedIds.delete(userId); el.closest('tr').classList.remove('selected'); }
+  else { selectedIds.add(userId); el.closest('tr').classList.add('selected'); }
+}
+async function inviteSelected() { await api().invite_selected(Array.from(selectedIds)); selectedIds.clear(); refresh(); }
+async function markSelectedInvited() { await api().mark_invited(Array.from(selectedIds)); selectedIds.clear(); refresh(); }
+async function clearList() { await api().clear_list(); selectedIds.clear(); refresh(); }
+async function saveList() {
+  const result = await api().save_list();
+  if (result.error) alert('Save failed: ' + result.error);
+}
+async function loadList() {
+  const result = await api().load_list();
+  if (result.error) alert('Load failed: ' + result.error);
+  refresh();
+}
+
+async function refresh() {
+  const state = await api().get_state();
+
+  document.getElementById('logFolderVal').textContent = state.vrchat_log_folder || '(not set)';
+  document.getElementById('groupVal').textContent = state.group_id || '(not set)';
+  document.getElementById('authVal').textContent = state.auth_display || 'Not logged in';
+  document.getElementById('authDot').className = 'status-dot ' + (state.auth_ok ? 'ok' : 'bad');
+  document.getElementById('autoInviteToggle').checked = state.auto_invite_on_join;
+  document.getElementById('verifiedToggle').checked = state.verified_18plus_mode;
+  document.getElementById('delayInput').value = state.verified_18plus_delay_seconds;
+  document.getElementById('watchingStat').textContent = 'Watching: ' + (state.watching_file || '(not started)');
+  document.getElementById('totalInvitedStat').textContent = 'Total invited: ' + state.total_invited;
+
+  const tbody = document.getElementById('detectedBody');
+  tbody.innerHTML = state.detected.map(d => `
+    <tr class="${selectedIds.has(d.user_id) ? 'selected' : ''}">
+      <td><input type="checkbox" ${selectedIds.has(d.user_id) ? 'checked' : ''} onclick="toggleSelect('${d.user_id}', this)"></td>
+      <td>${d.name}</td>
+      <td style="color:#9d90b8">${d.user_id}</td>
+      <td><span class="badge ${d.invited ? 'yes' : 'no'}">${d.invited ? 'Yes' : 'No'}</span></td>
+    </tr>`).join('');
+
+  const log = document.getElementById('activityLog');
+  const wasAtBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+  log.innerHTML = state.activity.map(a => `<div>${a}</div>`).join('');
+  if (wasAtBottom) log.scrollTop = log.scrollHeight;
+}
+
+setInterval(refresh, 1500);
+window.addEventListener('pywebviewready', refresh);
+</script>
+</body>
+</html>
