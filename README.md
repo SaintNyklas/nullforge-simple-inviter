@@ -58,7 +58,7 @@ having already gated the instance.
 ## Building the .exe yourself
 
 ```
-pyinstaller --onefile --windowed --name "NullforgeSimpleInviter" --icon=assets/nullforge_icon.ico --add-data "ui;ui" nullforge_simple_inviter.py
+pyinstaller --onefile --windowed --name "NullforgeSimpleInviter" --icon=assets/nullforge_icon.ico --version-file=version_info.txt --add-data "ui;ui" nullforge_simple_inviter.py
 ```
 
 Or push a version tag (`git tag v1.0.0 && git push origin v1.0.0`) and
@@ -90,6 +90,14 @@ deliberately does not include features to coordinate multiple accounts or
 otherwise work around VRChat's per-account limits. Please respect VRChat's
 Terms of Service when using it, and don't use it to invite people who
 haven't consented to joining your group's instances.
+
+## Tips
+
+Your support helps maintain and improve Nullforge Simple Inviter. If you find this tool useful, please consider tipping:
+
+- [Ko-fi](https://ko-fi.com/saintnyklas)
+- [Buy Me a Coffee](https://buymeacoffee.com/saintnyklas)
+- Cash App: [$RajinPatel](https://cash.app/$RajinPatel)
 
 ## License
 
